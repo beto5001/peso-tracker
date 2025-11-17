@@ -10,8 +10,20 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  query,
+  where,
+  DocumentData,
+  doc,
+} from "firebase/firestore";
+import { getDb } from "./lib/firebase";
 
 interface WeightEntry {
+  id: string; // id do documento no Firestore
   date: string;
   weight: number;
 }
@@ -29,43 +41,45 @@ const HomePage: React.FC = () => {
   const [erro, setErro] = useState<string>("");
   const [isClient, setIsClient] = useState<boolean>(false);
 
-  useEffect(() => {
-    setIsClient(true); // evita problemas de SSR com Recharts
-  }, []);
+  const db = getDb();
 
   async function carregarPesos(): Promise<void> {
+    setCarregando(true);
+    setErro("");
+
     try {
-      setCarregando(true);
-      setErro("");
+      const colRef = collection(db, "weights");
+      const snapshot = await getDocs(colRef);
 
-      const res: Response = await fetch("/api/weights");
-      const json = await res.json();
+      const lista: WeightEntry[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as DocumentData;
+        return {
+          id: docSnap.id,
+          date: data.date as string,
+          weight: Number(data.weight),
+        };
+      });
 
-      if (!res.ok) {
-        setErro(json?.error ?? "Erro ao buscar dados.");
-        return;
-      }
-
-      const lista: WeightEntry[] = Array.isArray(json) ? json : [];
-
-      const ordenados: WeightEntry[] = [...lista].sort(
+      const ordenados = [...lista].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
 
       setPesos(ordenados);
     } catch (error) {
       console.error(error);
-      setErro("Erro ao comunicar com o servidor.");
+      setErro("Erro ao carregar dados do Firebase.");
     } finally {
       setCarregando(false);
     }
   }
 
   useEffect(() => {
+    setIsClient(true);
     void carregarPesos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleAddPeso(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro("");
 
@@ -74,37 +88,33 @@ const HomePage: React.FC = () => {
       return;
     }
 
+    const pesoNumero = Number(peso);
+    if (Number.isNaN(pesoNumero) || pesoNumero <= 0) {
+      setErro("Peso inválido.");
+      return;
+    }
+
     try {
-      const response: Response = await fetch("/api/weights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: data, weight: Number(peso) }),
+      const colRef = collection(db, "weights");
+      await addDoc(colRef, {
+        date: data,
+        weight: pesoNumero,
+        createdAt: new Date().toISOString(),
       });
-
-      const json = await response.json();
-
-      if (!response.ok) {
-        setErro(json?.error ?? "Erro ao salvar peso.");
-        return;
-      }
 
       setData("");
       setPeso("");
       await carregarPesos();
     } catch (error) {
       console.error(error);
-      setErro("Erro ao comunicar com o servidor.");
+      setErro("Erro ao salvar no Firebase.");
     }
   }
 
   async function excluirRegistro(entry: WeightEntry): Promise<void> {
     try {
-      await fetch("/api/weights", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entry),
-      });
-
+      const docRef = doc(db, "weights", entry.id);
+      await deleteDoc(docRef);
       await carregarPesos();
     } catch (error) {
       console.error(error);
@@ -114,21 +124,21 @@ const HomePage: React.FC = () => {
 
   async function limparTudo(): Promise<void> {
     try {
-      await fetch("/api/weights?all=true", {
-        method: "DELETE",
-      });
+      const colRef = collection(db, "weights");
+      const snapshot = await getDocs(colRef);
 
+      // Para projetos pequenos está ok deletar numa sequência simples
+      const promises: Promise<void>[] = snapshot.docs.map((docSnap) =>
+        deleteDoc(doc(db, "weights", docSnap.id))
+      );
+
+      await Promise.all(promises);
       await carregarPesos();
     } catch (error) {
       console.error(error);
       setErro("Erro ao limpar registros.");
     }
   }
-
-  const maxPeso: number =
-    pesos.length > 0 ? Math.max(...pesos.map((p) => p.weight)) : 0;
-  const minPeso: number =
-    pesos.length > 0 ? Math.min(...pesos.map((p) => p.weight)) : 0;
 
   function formatarDataCurta(dateString: string): string {
     const dataObj: Date = new Date(dateString);
@@ -141,6 +151,11 @@ const HomePage: React.FC = () => {
 
     return `${dia}/${mes}`;
   }
+
+  const maxPeso: number =
+    pesos.length > 0 ? Math.max(...pesos.map((p) => p.weight)) : 0;
+  const minPeso: number =
+    pesos.length > 0 ? Math.min(...pesos.map((p) => p.weight)) : 0;
 
   const chartData: ChartPoint[] = pesos.map((p) => ({
     name: formatarDataCurta(p.date),
@@ -165,7 +180,7 @@ const HomePage: React.FC = () => {
           backgroundColor: "#020617",
           borderRadius: "1rem",
           padding: "2rem",
-          boxShadow: "0 20px 30px rgba(0,0,0,0.6)",
+          boxShadow: "0 20px 30px rgba(0, 0, 0, 0.6)",
           border: "1px solid #1f2937",
         }}
       >
@@ -183,7 +198,7 @@ const HomePage: React.FC = () => {
               Monitor de Emagrecimento
             </h1>
             <p style={{ marginBottom: "0.2rem", color: "#9ca3af" }}>
-              Registre seu peso e acompanhe a evolução.
+              Registre seu peso e acompanhe a evolução (dados no Firebase).
             </p>
             {pesos.length > 0 && (
               <p style={{ fontSize: "0.9rem", color: "#6b7280" }}>
@@ -194,7 +209,7 @@ const HomePage: React.FC = () => {
           </div>
 
           <button
-            onClick={limparTudo}
+            onClick={() => void limparTudo()}
             style={{
               padding: "0.5rem 1rem",
               borderRadius: "999px",
@@ -210,7 +225,7 @@ const HomePage: React.FC = () => {
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleAddPeso}
           style={{
             display: "flex",
             gap: "1rem",
@@ -295,10 +310,9 @@ const HomePage: React.FC = () => {
           <p>Nenhum peso cadastrado ainda. Comece adicionando o primeiro 🙂</p>
         ) : (
           <>
-            {/* GRÁFICO DE BARRAS COM RECHARTS */}
             <div
               style={{
-                height: "600px",
+                height: "700px",
                 marginBottom: "2rem",
                 backgroundColor: "#020617",
                 borderRadius: "0.75rem",
@@ -327,7 +341,7 @@ const HomePage: React.FC = () => {
                       tick={{ fontSize: 11, fill: "#9ca3af" }}
                     />
                     <YAxis
-                      domain={[65, 110]}
+                      domain={[50, 110]}
                       tick={{ fontSize: 11, fill: "#9ca3af" }}
                       tickLine={false}
                     />
@@ -339,11 +353,11 @@ const HomePage: React.FC = () => {
                         fontSize: "0.85rem",
                       }}
                       labelStyle={{ color: "#e5e7eb" }}
-                      cursor={{ fill: "rgba(55,65,81,0.3)" }}
+                      cursor={{ fill: "rgba(55, 65, 81, 0.3)" }}
                     />
                     <Bar
                       dataKey="weight"
-                      fill="#22C55E"   // 💚 verde bem vivo
+                      fill="#22C55E"
                       isAnimationActive={true}
                       animationDuration={800}
                       animationEasing="ease-out"
@@ -354,7 +368,6 @@ const HomePage: React.FC = () => {
               )}
             </div>
 
-            {/* LISTA COM BARRAS HORIZONTAIS + BOTÃO REMOVER */}
             <div>
               <h2
                 style={{
@@ -373,14 +386,15 @@ const HomePage: React.FC = () => {
                 }}
               >
                 {pesos.map((p) => {
-                  const percent: number =
-                    maxPeso === minPeso
-                      ? 100
-                      : ((p.weight - minPeso) / (maxPeso - minPeso)) * 100;
+                  const percent = ((p.weight - 50) / (110 - 50)) * 100;
+                  const boundedPercent = Math.max(
+                    0,
+                    Math.min(100, percent)
+                  );
 
                   return (
                     <div
-                      key={`${p.date}-${p.weight}`}
+                      key={p.id}
                       style={{
                         paddingBottom: "0.6rem",
                         borderBottom: "1px solid #1f2937",
@@ -426,7 +440,7 @@ const HomePage: React.FC = () => {
                         <div
                           style={{
                             height: "100%",
-                            width: `${percent}%`,
+                            width: `${boundedPercent}%`,
                             background:
                               "linear-gradient(90deg, #22c55e, #a3e635, #22c55e)",
                             transition: "width 0.4s ease",
