@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📉 Peso Tracker – Monitor de Emagrecimento
 
-## Getting Started
+Aplicação simples e eficiente construída em **Next.js + React + TypeScript** para acompanhar a evolução do peso corporal ao longo do tempo.  
+Os dados são armazenados localmente em um arquivo **CSV**, permitindo total privacidade.
 
-First, run the development server:
+Inclui:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+✔ Registro diário de peso  
+✔ Gráfico com animação utilizando **Recharts**  
+✔ Remoção de registros  
+✔ Limpeza completa dos dados  
+✔ Interface dark moderna  
+✔ Dados persistidos localmente em `data/weights.csv`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🖼️ Preview do Projeto
+<img width="939" height="857" alt="image" src="https://github.com/user-attachments/assets/b9611dd3-47a4-4432-80ca-1b7e45f7952c" />
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Tecnologias Utilizadas
 
-## Learn More
+- **Next.js 14 (App Router)**
+- **React 18**
+- **TypeScript**
+- **Recharts**
+- **CSV Local para persistência**
+- **Node.js (File System)**
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Estrutura do Projeto
+peso-tracker/
+├─ app/
+│ ├─ api/
+│ │ └─ weights/
+│ │ └─ route.ts # API de leitura/escrita no CSV
+│ └─ page.tsx # Interface principal com gráfico animado
+│
+├─ data/
+│ └─ weights.csv # Dados de peso (não vai para o Git)
+│
+├─ .gitignore
+├─ package.json
+├─ README.md
