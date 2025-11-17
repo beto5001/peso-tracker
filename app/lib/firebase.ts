@@ -1,13 +1,19 @@
 // lib/firebase.ts
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getFirestore, Firestore } from "firebase/firestore";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  Auth,
+} from "firebase/auth";
 
-let firebaseApp: FirebaseApp;
-let db: Firestore;
+let firebaseApp: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let auth: Auth | null = null;
+let googleProvider: GoogleAuthProvider | null = null;
 
 export function getFirebaseApp(): FirebaseApp {
   if (!firebaseApp) {
-    // Em produção você deveria usar variáveis de ambiente
     firebaseApp =
       getApps()[0] ??
       initializeApp({
@@ -30,4 +36,19 @@ export function getDb(): Firestore {
     db = getFirestore(app);
   }
   return db;
+}
+
+export function getAuthInstance(): Auth {
+  if (!auth) {
+    const app = getFirebaseApp();
+    auth = getAuth(app);
+  }
+  return auth;
+}
+
+export function getGoogleProvider(): GoogleAuthProvider {
+  if (!googleProvider) {
+    googleProvider = new GoogleAuthProvider();
+  }
+  return googleProvider;
 }
